@@ -16,32 +16,32 @@ warnings.filterwarnings('ignore')
 # ============================================================
 # 日本語フォント設定（Streamlit Cloud対応・フォントファイル同梱方式）
 # ============================================================
+
 def setup_japanese_font():
-    # 方法1: japanize_matplotlib
+    from matplotlib import font_manager
+    base_dir  = os.path.dirname(os.path.abspath(__file__))
+    font_name = "NotoSansJP-Regular.ttf"
+    candidates = [
+        os.path.join(base_dir, font_name),
+        f"/mount/src/market-chart-app/{font_name}",
+        f"/app/{font_name}",
+        font_name,
+    ]
+    for fp in candidates:
+        if os.path.exists(fp):
+            try:
+                font_manager.fontManager.addfont(fp)
+                prop = font_manager.FontProperties(fname=fp)
+                matplotlib.rcParams["font.family"] = prop.get_name()
+                matplotlib.rcParams["axes.unicode_minus"] = False
+                return True
+            except Exception:
+                pass
     try:
         import japanize_matplotlib
         return True
     except ImportError:
         pass
-
-    # 方法2: 同梱フォントファイル（NotoSansJP-Regular.ttf）
-    from matplotlib import font_manager
-    font_candidates = [
-        os.path.join(os.path.dirname(__file__), "NotoSansJP-Regular.ttf"),
-        "/app/NotoSansJP-Regular.ttf",
-        "NotoSansJP-Regular.ttf",
-    ]
-    for font_path in font_candidates:
-        if os.path.exists(font_path):
-            try:
-                font_manager.fontManager.addfont(font_path)
-                prop = font_manager.FontProperties(fname=font_path)
-                matplotlib.rcParams['font.family'] = prop.get_name()
-                matplotlib.rcParams['axes.unicode_minus'] = False
-                return True
-            except Exception:
-                pass
-
     return False
 
 JAPANESE_OK = setup_japanese_font()
