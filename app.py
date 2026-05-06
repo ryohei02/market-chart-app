@@ -288,7 +288,7 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
     for sp in ax_main.spines.values():
         sp.set_color('#2a2a4a')
     ax_main.grid(color='#1e1e3a', linewidth=0.5, alpha=0.8)
-    ax_main.legend(fontsize=8, loc='upper left', facecolor='#0d0d1a',
+    ax_main.legend(fontsize=10, loc='upper left', facecolor='#0d0d1a',
                    labelcolor='#e0e0e0', framealpha=0.8, ncol=2)
     ax_main.set_xlim(-1, len(df))
     plt.setp(ax_main.get_xticklabels(), visible=False)
@@ -366,12 +366,12 @@ def generate_image(group_dict, group_title, interval, end_date=None):
     fig = plt.figure(figsize=(20, 18), facecolor='#0a0a1a')
     outer_gs = gridspec.GridSpec(
         2, 2, figure=fig,
-        hspace=0.42, wspace=0.14,
-        left=0.02, right=0.98, top=0.955, bottom=0.03
+        hspace=0.48, wspace=0.14,
+        left=0.02, right=0.98, top=0.93, bottom=0.03
     )
     fig.suptitle(
         f"{group_title}  [{label}]  Updated: {now_str} JST",
-        fontsize=16, color='#e0e0e0', fontweight='bold', y=0.978
+        fontsize=14, color='#e0e0e0', fontweight='bold', y=0.965
     )
 
     for i, (name, info) in enumerate(group_dict.items()):
