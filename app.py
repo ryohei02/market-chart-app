@@ -275,21 +275,14 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
     title_info  = (f"Trend: {trend}  |  Range: {rng_label} ({rng_pos:.0f}%)"
                    if rng_pos is not None else f"Trend: {trend}")
 
+    range_str = f"  |  {rng_label} ({rng_pos:.0f}%)" if rng_pos is not None else ""
     ax_main.set_title(
-        f"{title_name}",
-        fontsize=15, color='#ffffff', pad=4,
+        f"{title_name}   {price_fmt}  ({pct_chg:+.2f}%){risk_str}\n"
+        f"{trend}{range_str}",
+        fontsize=12, color='#ffffff', pad=5,
         loc='left', fontweight='bold',
         backgroundcolor='#0d0d1a'
     )
-    # Price + trend as text inside the axes (top-left, below title)
-    ax_main.text(0.01, 0.97, f"{title_price}",
-                 transform=ax_main.transAxes, fontsize=12,
-                 color='#f5f5f5', fontweight='bold', va='top', ha='left',
-                 bbox=dict(facecolor='#0d0d1a', alpha=0.0))
-    ax_main.text(0.01, 0.90, f"{title_info}",
-                 transform=ax_main.transAxes, fontsize=10,
-                 color='#b0bec5', va='top', ha='left',
-                 bbox=dict(facecolor='#0d0d1a', alpha=0.0))
 
     # Axes styling
     ax_main.tick_params(colors='#9e9e9e', labelsize=8)
