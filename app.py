@@ -276,11 +276,20 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
                    if rng_pos is not None else f"Trend: {trend}")
 
     ax_main.set_title(
-        f"{title_name}\n{title_price}\n{title_info}",
-        fontsize=13, color='#f5f5f5', pad=6,
+        f"{title_name}",
+        fontsize=15, color='#ffffff', pad=4,
         loc='left', fontweight='bold',
         backgroundcolor='#0d0d1a'
     )
+    # Price + trend as text inside the axes (top-left, below title)
+    ax_main.text(0.01, 0.97, f"{title_price}",
+                 transform=ax_main.transAxes, fontsize=12,
+                 color='#f5f5f5', fontweight='bold', va='top', ha='left',
+                 bbox=dict(facecolor='#0d0d1a', alpha=0.0))
+    ax_main.text(0.01, 0.90, f"{title_info}",
+                 transform=ax_main.transAxes, fontsize=10,
+                 color='#b0bec5', va='top', ha='left',
+                 bbox=dict(facecolor='#0d0d1a', alpha=0.0))
 
     # Axes styling
     ax_main.tick_params(colors='#9e9e9e', labelsize=8)
@@ -366,12 +375,12 @@ def generate_image(group_dict, group_title, interval, end_date=None):
     fig = plt.figure(figsize=(20, 18), facecolor='#0a0a1a')
     outer_gs = gridspec.GridSpec(
         2, 2, figure=fig,
-        hspace=0.48, wspace=0.14,
-        left=0.02, right=0.98, top=0.93, bottom=0.03
+        hspace=0.52, wspace=0.14,
+        left=0.02, right=0.98, top=0.90, bottom=0.03
     )
     fig.suptitle(
         f"{group_title}  [{label}]  Updated: {now_str} JST",
-        fontsize=14, color='#e0e0e0', fontweight='bold', y=0.965
+        fontsize=14, color='#e0e0e0', fontweight='bold', y=0.950
     )
 
     for i, (name, info) in enumerate(group_dict.items()):
