@@ -14,68 +14,29 @@ import os
 warnings.filterwarnings('ignore')
 
 # ============================================================
-# 日本語フォント設定（Streamlit Cloud対応・フォントファイル同梱方式）
+# Font setup (English only - no Japanese font needed)
 # ============================================================
+matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+matplotlib.rcParams['axes.unicode_minus'] = False
 
-def setup_japanese_font():
-    from matplotlib import font_manager
-    base_dir  = os.path.dirname(os.path.abspath(__file__))
-    font_name = "NotoSansJP-Regular.ttf"
-    candidates = [
-        os.path.join(base_dir, font_name),
-        f"/mount/src/market-chart-app/{font_name}",
-        f"/app/{font_name}",
-        font_name,
-    ]
-    for fp in candidates:
-        if os.path.exists(fp):
-            try:
-                font_manager.fontManager.addfont(fp)
-                prop = font_manager.FontProperties(fname=fp)
-                matplotlib.rcParams["font.family"] = prop.get_name()
-                matplotlib.rcParams["axes.unicode_minus"] = False
-                return True
-            except Exception:
-                pass
-    try:
-        import japanize_matplotlib
-        return True
-    except ImportError:
-        pass
-    return False
-
-JAPANESE_OK = setup_japanese_font()
-
-# 表示名（フォールバック用ASCII）
-NAME_ASCII = {
-    "日経先物":   "Nikkei Futures",
-    "日経平均":   "Nikkei 225",
-    "SOX":        "SOX",
-    "Nasdaq先物": "Nasdaq Futures",
-    "VIX":        "VIX",
-    "日経VI":     "Nikkei VI",
-    "ドル円":     "USD/JPY",
-    "米10年金利": "US10Y",
+# ============================================================
+# Ticker Configuration
+# ============================================================
+# Group 1: Main trading instruments
+GROUP1 = {
+    "Nikkei Futures": {"symbol": "NKD=F",   "has_volume": True,  "risk_label": False},
+    "SOX":            {"symbol": "^SOX",     "has_volume": True,  "risk_label": False},
+    "Nasdaq Futures": {"symbol": "NQ=F",     "has_volume": True,  "risk_label": False},
+    "USD/JPY":        {"symbol": "USDJPY=X", "has_volume": False, "risk_label": False},
 }
 
-def disp(name):
-    return name if JAPANESE_OK else NAME_ASCII.get(name, name)
-
-# ============================================================
-# 設定
-# ============================================================
-TICKERS = {
-    "日経先物":   {"symbol": "NKD=F",    "has_volume": True,  "risk_label": False},
-    "日経平均":   {"symbol": "^N225",     "has_volume": True,  "risk_label": False},
-    "SOX":        {"symbol": "^SOX",      "has_volume": True,  "risk_label": False},
-    "Nasdaq先物": {"symbol": "NQ=F",      "has_volume": True,  "risk_label": False},
-    "VIX":        {"symbol": "^VIX",      "has_volume": False, "risk_label": True},
-    "日経VI":     {"symbol": "^NKVI.OS",  "has_volume": False, "risk_label": True},
-    "ドル円":     {"symbol": "USDJPY=X",  "has_volume": False, "risk_label": False},
-    "米10年金利": {"symbol": "^TNX",      "has_volume": False, "risk_label": False},
+# Group 2: Risk / macro indicators
+GROUP2 = {
+    "Nikkei 225":  {"symbol": "^N225",     "has_volume": True,  "risk_label": False},
+    "VIX":         {"symbol": "^VIX",      "has_volume": False, "risk_label": True},
+    "Nikkei VI":   {"symbol": "^NKVI.OS",  "has_volume": False, "risk_label": True},
+    "US 10Y Yield":{"symbol": "^TNX",      "has_volume": False, "risk_label": False},
 }
-
-TICKER_NAMES = list(TICKERS.keys())
 
 MA_SETTINGS = {
     "5m":  {"ma_short": 9,  "ma_long": 21, "rsi": False, "prev_close": False},
@@ -86,11 +47,11 @@ MA_SETTINGS = {
 PERIOD_SETTINGS = {
     "5m":  "5d",
     "30m": "15d",
-    "1d":  "6mo",
+    "1d":  "3mo",  # shortened to avoid NKD=F rollover issues
 }
 
 # ============================================================
-# データ取得
+# Data Fetching
 # ============================================================
 @st.cache_data(ttl=300)
 def fetch_data(symbol, interval, end_date=None):
@@ -118,11 +79,9 @@ def fetch_data(symbol, interval, end_date=None):
         if df is None or df.empty:
             return None
 
-        # MultiIndex解除
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
-        # 必須カラム確認
         for col in ['Open', 'High', 'Low', 'Close']:
             if col not in df.columns:
                 return None
@@ -131,7 +90,7 @@ def fetch_data(symbol, interval, end_date=None):
             df['Volume'] = 0.0
 
         df = df[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
-        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+        for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
         df.dropna(subset=['Open', 'High', 'Low', 'Close'], inplace=True)
 
@@ -141,7 +100,7 @@ def fetch_data(symbol, interval, end_date=None):
         return None
 
 # ============================================================
-# 指標計算
+# Indicator Calculations
 # ============================================================
 def calc_rsi(series, period=14):
     delta = series.diff()
@@ -168,9 +127,9 @@ def calc_trend(df, ma_col):
         ma_vals = df[ma_col].dropna()
         if len(ma_vals) < 2:
             return "N/A"
-        cur   = float(df['Close'].iloc[-1])
-        ma_n  = float(ma_vals.iloc[-1])
-        ma_p  = float(ma_vals.iloc[-2])
+        cur  = float(df['Close'].iloc[-1])
+        ma_n = float(ma_vals.iloc[-1])
+        ma_p = float(ma_vals.iloc[-2])
         if cur > ma_n and ma_n > ma_p:
             return "Uptrend ↑"
         elif cur < ma_n and ma_n < ma_p:
@@ -182,9 +141,9 @@ def calc_trend(df, ma_col):
 
 def calc_range_position(df, days=20):
     try:
-        recent  = df['Close'].tail(days)
-        hi, lo  = float(recent.max()), float(recent.min())
-        cur     = float(df['Close'].iloc[-1])
+        recent = df['Close'].tail(days)
+        hi, lo = float(recent.max()), float(recent.min())
+        cur    = float(df['Close'].iloc[-1])
         if hi == lo:
             return 50.0, "Mid"
         pos   = (cur - lo) / (hi - lo) * 100
@@ -194,7 +153,7 @@ def calc_range_position(df, days=20):
         return None, "-"
 
 # ============================================================
-# 1銘柄チャート描画
+# Single Chart Drawing
 # ============================================================
 def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
     has_volume = info["has_volume"]
@@ -204,36 +163,33 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
     ma_short   = settings["ma_short"]
     ma_long    = settings["ma_long"]
 
-    dname = disp(name)
-
-    # レイアウト（RSIあり：3段、なし：2段）
+    # Layout: 3-panel (RSI) or 2-panel
     if show_rsi:
-        hr = [3, 1, 1] if has_volume else [4, 1, 0.01]
-        inner   = gridspec.GridSpecFromSubplotSpec(
+        hr    = [3, 1, 1] if has_volume else [4, 1, 0.01]
+        inner = gridspec.GridSpecFromSubplotSpec(
             3, 1, subplot_spec=outer_gs[row, col], hspace=0.06, height_ratios=hr)
         ax_main = fig.add_subplot(inner[0])
         ax_rsi  = fig.add_subplot(inner[1], sharex=ax_main)
         ax_vol  = fig.add_subplot(inner[2], sharex=ax_main)
     else:
-        hr = [4, 1] if has_volume else [4, 0.01]
-        inner   = gridspec.GridSpecFromSubplotSpec(
+        hr    = [4, 1] if has_volume else [4, 0.01]
+        inner = gridspec.GridSpecFromSubplotSpec(
             2, 1, subplot_spec=outer_gs[row, col], hspace=0.06, height_ratios=hr)
         ax_main = fig.add_subplot(inner[0])
         ax_rsi  = None
         ax_vol  = fig.add_subplot(inner[1], sharex=ax_main)
 
-    # データなし
+    # No data
     if df is None or df.empty:
         ax_main.set_facecolor('#1a1a2e')
-        ax_main.text(0.5, 0.5, f"{dname}\nNo Data / Error",
-                     ha='center', va='center', fontsize=12,
+        ax_main.text(0.5, 0.5, f"{name}\nNo Data / Error",
+                     ha='center', va='center', fontsize=16,
                      color='#ff5252', transform=ax_main.transAxes, fontweight='bold')
         for ax in [ax_rsi, ax_vol]:
-            if ax:
-                ax.set_visible(False)
+            if ax: ax.set_visible(False)
         return
 
-    # MA計算
+    # MA calculation
     df = df.copy()
     df[f'MA{ma_short}'] = df['Close'].rolling(ma_short).mean()
     df[f'MA{ma_long}']  = df['Close'].rolling(ma_long).mean()
@@ -243,7 +199,7 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
     if show_rsi:
         df['RSI'] = calc_rsi(df['Close'])
 
-    # 情報計算
+    # Stats
     current        = float(df['Close'].iloc[-1])
     prev_close_val = get_prev_close(df)
     pct_chg        = ((current - prev_close_val) / prev_close_val * 100) if prev_close_val else 0
@@ -252,15 +208,19 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
 
     risk_str = ""
     if is_risk:
-        risk_str = "  [Risk-OFF▲]" if pct_chg > 0 else "  [Risk-ON▼]"
+        risk_str = "  [Risk-OFF ▲]" if pct_chg > 0 else "  [Risk-ON ▼]"
 
-    price_fmt = f"{current:,.3f}" if current < 10 else (
-                f"{current:,.1f}" if current > 10000 else f"{current:,.2f}")
-    t1 = f"{dname}  {price_fmt}  ({pct_chg:+.2f}%){risk_str}"
-    t2 = (f"Trend: {trend}  |  Range: {rng_label} ({rng_pos:.0f}%)"
-          if rng_pos is not None else f"Trend: {trend}")
+    # Price formatting
+    if current < 10:
+        price_fmt = f"{current:,.3f}"
+    elif current > 10000:
+        price_fmt = f"{current:,.1f}"
+    else:
+        price_fmt = f"{current:,.2f}"
 
-    # ローソク足描画
+    # ============================================================
+    # Candle chart
+    # ============================================================
     idx    = np.arange(len(df))
     opens  = df['Open'].values
     closes = df['Close'].values
@@ -271,71 +231,82 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
     ax_main.set_facecolor('#0d0d1a')
     for i in range(len(df)):
         o, c, h, l = opens[i], closes[i], highs[i], lows[i]
-        if np.isnan(o) or np.isnan(c) or np.isnan(h) or np.isnan(l):
+        if any(np.isnan(v) for v in [o, c, h, l]):
             continue
         color = '#ef5350' if c >= o else '#42a5f5'
-        ax_main.plot([i, i], [l, h], color=color, linewidth=0.7, zorder=1)
+        ax_main.plot([i, i], [l, h], color=color, linewidth=0.8, zorder=1)
         body_h = max(abs(c - o), (h - l) * 0.005)
         rect   = Rectangle((i - width/2, min(o, c)), width, body_h,
                             facecolor=color, edgecolor=color, linewidth=0.3, zorder=2)
         ax_main.add_patch(rect)
 
-    # MA線
-    ma_list = [(f'MA{ma_short}', '#ffeb3b', 1.1),
-               (f'MA{ma_long}',  '#ff9800', 1.1)]
+    # MA lines
+    ma_list = [(f'MA{ma_short}', '#ffeb3b', 1.3),
+               (f'MA{ma_long}',  '#ff9800', 1.3)]
     if interval == "1d":
-        ma_list += [('MA5', '#00e5ff', 0.9), ('MA200', '#e040fb', 0.9)]
+        ma_list += [('MA5', '#00e5ff', 1.1), ('MA200', '#e040fb', 1.1)]
 
     for col_name, color, lw in ma_list:
         if col_name in df.columns:
             ax_main.plot(idx, df[col_name].values, color=color,
                          linewidth=lw, label=col_name, alpha=0.9, zorder=3)
 
-    # 前日終値ライン
+    # Prev close line
     if show_prev and prev_close_val:
-        ax_main.axhline(prev_close_val, color='#00e676', linewidth=1.1,
+        ax_main.axhline(prev_close_val, color='#00e676', linewidth=1.2,
                         linestyle='--', alpha=0.85,
                         label=f'Prev {price_fmt}', zorder=4)
 
-    # 高値・安値注記
+    # High / Low annotation
     try:
         hi_i = int(np.nanargmax(highs))
         lo_i = int(np.nanargmin(lows))
-        ax_main.annotate(f'H:{highs[hi_i]:,.1f}', xy=(hi_i, highs[hi_i]),
-                         fontsize=7.5, color='#ff8a80', ha='center', va='bottom')
-        ax_main.annotate(f'L:{lows[lo_i]:,.1f}',  xy=(lo_i, lows[lo_i]),
-                         fontsize=7.5, color='#82b1ff', ha='center', va='top')
+        ax_main.annotate(f'H: {highs[hi_i]:,.1f}', xy=(hi_i, highs[hi_i]),
+                         fontsize=9, color='#ff8a80', ha='center', va='bottom', fontweight='bold')
+        ax_main.annotate(f'L: {lows[lo_i]:,.1f}',  xy=(lo_i, lows[lo_i]),
+                         fontsize=9, color='#82b1ff', ha='center', va='top',  fontweight='bold')
     except:
         pass
 
-    # タイトル・スタイル
-    ax_main.set_title(f"{t1}\n{t2}", fontsize=9.5, color='#e0e0e0',
-                      pad=5, loc='left', fontweight='bold',
-                      backgroundcolor='#0d0d1a')
-    ax_main.tick_params(colors='#9e9e9e', labelsize=7.5)
+    # ---- Title (large, prominent) ----
+    color_pct = '#ff5252' if pct_chg >= 0 else '#40c4ff'
+    title_name  = f"{name}"
+    title_price = f"{price_fmt}  ({pct_chg:+.2f}%){risk_str}"
+    title_info  = (f"Trend: {trend}  |  Range: {rng_label} ({rng_pos:.0f}%)"
+                   if rng_pos is not None else f"Trend: {trend}")
+
+    ax_main.set_title(
+        f"{title_name}\n{title_price}\n{title_info}",
+        fontsize=13, color='#f5f5f5', pad=6,
+        loc='left', fontweight='bold',
+        backgroundcolor='#0d0d1a'
+    )
+
+    # Axes styling
+    ax_main.tick_params(colors='#9e9e9e', labelsize=8)
     ax_main.yaxis.tick_right()
     for sp in ax_main.spines.values():
         sp.set_color('#2a2a4a')
-    ax_main.grid(color='#1e1e3a', linewidth=0.4, alpha=0.8)
-    ax_main.legend(fontsize=7, loc='upper left', facecolor='#0d0d1a',
+    ax_main.grid(color='#1e1e3a', linewidth=0.5, alpha=0.8)
+    ax_main.legend(fontsize=8, loc='upper left', facecolor='#0d0d1a',
                    labelcolor='#e0e0e0', framealpha=0.8, ncol=2)
     ax_main.set_xlim(-1, len(df))
     plt.setp(ax_main.get_xticklabels(), visible=False)
 
-    # RSIパネル
+    # ---- RSI panel ----
     if ax_rsi:
         if show_rsi and 'RSI' in df.columns:
             ax_rsi.set_facecolor('#0d0d1a')
             rv = df['RSI'].values
-            ax_rsi.plot(idx, rv, color='#ce93d8', linewidth=0.9)
-            ax_rsi.axhline(70, color='#ef9a9a', linewidth=0.6, linestyle='--')
-            ax_rsi.axhline(30, color='#90caf9', linewidth=0.6, linestyle='--')
+            ax_rsi.plot(idx, rv, color='#ce93d8', linewidth=1.0)
+            ax_rsi.axhline(70, color='#ef9a9a', linewidth=0.7, linestyle='--')
+            ax_rsi.axhline(30, color='#90caf9', linewidth=0.7, linestyle='--')
             ax_rsi.fill_between(idx, rv, 70, where=(rv >= 70), alpha=0.25, color='#ef5350')
             ax_rsi.fill_between(idx, rv, 30, where=(rv <= 30), alpha=0.25, color='#42a5f5')
             ax_rsi.set_ylim(0, 100)
             ax_rsi.set_yticks([30, 70])
-            ax_rsi.set_ylabel('RSI', fontsize=7, color='#9e9e9e')
-            ax_rsi.tick_params(colors='#9e9e9e', labelsize=6.5)
+            ax_rsi.set_ylabel('RSI', fontsize=8, color='#9e9e9e')
+            ax_rsi.tick_params(colors='#9e9e9e', labelsize=7)
             ax_rsi.yaxis.tick_right()
             for sp in ax_rsi.spines.values():
                 sp.set_color('#2a2a4a')
@@ -344,7 +315,7 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
             ax_rsi.set_visible(False)
         plt.setp(ax_rsi.get_xticklabels(), visible=False)
 
-    # X軸ラベル設定ヘルパー
+    # X-axis tick helper
     def set_xticks(ax_t):
         n    = len(df)
         step = max(1, n // 6)
@@ -358,9 +329,9 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
             except:
                 labs.append("")
         ax_t.set_xticks(pos)
-        ax_t.set_xticklabels(labs, fontsize=6.5, color='#9e9e9e')
+        ax_t.set_xticklabels(labs, fontsize=7.5, color='#9e9e9e')
 
-    # 出来高パネル
+    # ---- Volume panel ----
     if has_volume:
         ax_vol.set_facecolor('#0d0d1a')
         vol   = df['Volume'].values.astype(float)
@@ -368,9 +339,9 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
                  for i in range(len(df))]
         ax_vol.bar(idx, vol, color=vcols, alpha=0.55, width=0.7)
         vol_ma = pd.Series(vol).rolling(20).mean().values
-        ax_vol.plot(idx, vol_ma, color='#fff176', linewidth=0.9, label='Vol MA20')
-        ax_vol.set_ylabel('Vol', fontsize=7, color='#9e9e9e')
-        ax_vol.tick_params(colors='#9e9e9e', labelsize=6.5)
+        ax_vol.plot(idx, vol_ma, color='#fff176', linewidth=1.0, label='Vol MA20')
+        ax_vol.set_ylabel('Vol', fontsize=8, color='#9e9e9e')
+        ax_vol.tick_params(colors='#9e9e9e', labelsize=7)
         ax_vol.yaxis.tick_right()
         for sp in ax_vol.spines.values():
             sp.set_color('#2a2a4a')
@@ -385,27 +356,28 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
 
 
 # ============================================================
-# 8銘柄まとめて1枚画像生成
+# Generate one 2x2 image for a group of 4 tickers
 # ============================================================
-def generate_image(interval, end_date=None):
+def generate_image(group_dict, group_title, interval, end_date=None):
     settings = MA_SETTINGS[interval]
     now_str  = datetime.now().strftime("%Y-%m-%d %H:%M")
     label    = {"5m": "5min", "30m": "30min", "1d": "Daily"}[interval]
 
-    fig = plt.figure(figsize=(28, 36), facecolor='#0a0a1a')
+    fig = plt.figure(figsize=(20, 18), facecolor='#0a0a1a')
     outer_gs = gridspec.GridSpec(
-        2, 4, figure=fig,
-        hspace=0.40, wspace=0.14,
-        left=0.02, right=0.98, top=0.965, bottom=0.02
+        2, 2, figure=fig,
+        hspace=0.42, wspace=0.14,
+        left=0.02, right=0.98, top=0.955, bottom=0.03
     )
-    fig.suptitle(f"Market Overview  [{label}]  Updated: {now_str} JST",
-                 fontsize=15, color='#e0e0e0', fontweight='bold', y=0.982)
+    fig.suptitle(
+        f"{group_title}  [{label}]  Updated: {now_str} JST",
+        fontsize=16, color='#e0e0e0', fontweight='bold', y=0.978
+    )
 
-    for i, name in enumerate(TICKER_NAMES):
-        row  = i // 4
-        col  = i % 4
-        info = TICKERS[name]
-        df   = fetch_data(
+    for i, (name, info) in enumerate(group_dict.items()):
+        row = i // 2
+        col = i % 2
+        df  = fetch_data(
             info["symbol"], interval,
             end_date if interval == "1d" else None
         )
@@ -414,11 +386,58 @@ def generate_image(interval, end_date=None):
         except Exception as e:
             ax = fig.add_subplot(outer_gs[row, col])
             ax.set_facecolor('#1a1a2e')
-            ax.text(0.5, 0.5,
-                    f"{NAME_ASCII.get(name, name)}\nError:\n{str(e)[:60]}",
-                    ha='center', va='center', fontsize=9,
+            ax.text(0.5, 0.5, f"{name}\nError:\n{str(e)[:60]}",
+                    ha='center', va='center', fontsize=11,
                     color='#ff5252', transform=ax.transAxes)
     return fig
+
+
+# ============================================================
+# Helper: render one tab's two images
+# ============================================================
+def render_tab(interval, end_date=None):
+    label = {"5m": "5min", "30m": "30min", "1d": "Daily"}[interval]
+
+    if st.button(f"📊 Generate {label} Charts", key=f"btn_{interval}"):
+        now_str = datetime.now().strftime("%Y%m%d_%H%M")
+
+        # --- Image 1 ---
+        st.subheader("📈 Chart 1: Nikkei Futures / SOX / Nasdaq Futures / USD-JPY")
+        with st.spinner("Fetching data for Chart 1..."):
+            fig1 = generate_image(GROUP1, "Market Chart 1", interval, end_date)
+        st.pyplot(fig1, use_container_width=True)
+        buf1 = io.BytesIO()
+        fig1.savefig(buf1, format='png', dpi=150,
+                     bbox_inches='tight', facecolor='#0a0a1a')
+        buf1.seek(0)
+        st.download_button(
+            label="💾 Download Chart 1 PNG",
+            data=buf1,
+            file_name=f"chart1_{interval}_{now_str}.png",
+            mime="image/png",
+            key=f"dl1_{interval}"
+        )
+        plt.close(fig1)
+
+        st.divider()
+
+        # --- Image 2 ---
+        st.subheader("📉 Chart 2: Nikkei 225 / VIX / Nikkei VI / US 10Y Yield")
+        with st.spinner("Fetching data for Chart 2..."):
+            fig2 = generate_image(GROUP2, "Market Chart 2", interval, end_date)
+        st.pyplot(fig2, use_container_width=True)
+        buf2 = io.BytesIO()
+        fig2.savefig(buf2, format='png', dpi=150,
+                     bbox_inches='tight', facecolor='#0a0a1a')
+        buf2.seek(0)
+        st.download_button(
+            label="💾 Download Chart 2 PNG",
+            data=buf2,
+            file_name=f"chart2_{interval}_{now_str}.png",
+            mime="image/png",
+            key=f"dl2_{interval}"
+        )
+        plt.close(fig2)
 
 
 # ============================================================
@@ -431,38 +450,19 @@ st.markdown("""
 .stApp { background-color: #0a0a1a; color: #e0e0e0; }
 .stButton > button {
     background-color: #1565c0; color: white;
-    font-size: 15px; padding: 10px 28px;
+    font-size: 15px; padding: 10px 30px;
     border-radius: 8px; border: none; font-weight: bold;
 }
 .stButton > button:hover { background-color: #1976d2; }
-.stTabs [data-baseweb="tab"] { color: #90caf9; font-size: 15px; }
+.stTabs [data-baseweb="tab"] { color: #90caf9; font-size: 15px; font-weight: bold; }
+h2 { color: #90caf9 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 Market Overview Chart")
-st.caption("Data: Yahoo Finance  |  Cache: 5min  |  Click button to refresh")
+st.title("📈 Market Overview Chart App")
+st.caption("Data: Yahoo Finance  |  Cache: 5min  |  2 charts per timeframe (4 tickers each)")
 
 tab1, tab2, tab3 = st.tabs(["⚡ 5min", "🕐 30min", "📅 Daily"])
-
-def render_tab(interval, end_date=None):
-    label = {"5m": "5min", "30m": "30min", "1d": "Daily"}[interval]
-    if st.button(f"📊 Generate {label} Chart", key=f"btn_{interval}"):
-        with st.spinner(f"Fetching data & generating {label} chart..."):
-            fig = generate_image(interval, end_date)
-        st.pyplot(fig, use_container_width=True)
-        buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=150,
-                    bbox_inches='tight', facecolor='#0a0a1a')
-        buf.seek(0)
-        now_str = datetime.now().strftime("%Y%m%d_%H%M")
-        st.download_button(
-            label="💾 Download PNG",
-            data=buf,
-            file_name=f"market_{interval}_{now_str}.png",
-            mime="image/png",
-            key=f"dl_{interval}"
-        )
-        plt.close(fig)
 
 with tab1:
     render_tab("5m")
@@ -471,7 +471,7 @@ with tab2:
     render_tab("30m")
 
 with tab3:
-    st.subheader("📅 Select End Date (Daily)")
+    st.subheader("📅 Select End Date (Daily Chart)")
     today    = datetime.today().date()
     min_date = today - timedelta(days=30)
     end_date = st.date_input(
