@@ -362,7 +362,7 @@ def draw_chart(fig, outer_gs, row, col, name, info, df, interval, settings):
 # ============================================================
 def generate_image(group_dict, group_title, interval, end_date=None):
     settings = MA_SETTINGS[interval]
-    now_str  = datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_str  = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
     label    = {"5m": "5min", "30m": "30min", "1d": "Daily"}[interval]
 
     fig = plt.figure(figsize=(20, 18), facecolor='#0a0a1a')
@@ -401,7 +401,7 @@ def render_tab(interval, end_date=None):
     label = {"5m": "5min", "30m": "30min", "1d": "Daily"}[interval]
 
     if st.button(f"📊 Generate {label} Charts", key=f"btn_{interval}"):
-        now_str = datetime.now().strftime("%Y%m%d_%H%M")
+        now_str = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y%m%d_%H%M")
 
         # --- Image 1 ---
         st.subheader("📈 Chart 1: Nikkei Futures / SOX / Nasdaq Futures / USD-JPY")
