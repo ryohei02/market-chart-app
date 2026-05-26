@@ -39,13 +39,13 @@ GROUP2 = {
 }
 
 MA_SETTINGS = {
-    "5m":  {"ma_short": 9,  "ma_long": 21, "rsi": False, "prev_close": False},
+    "5m":  {"ma_short": 9,  "ma_long": 21, "rsi": True,  "prev_close": True},
     "30m": {"ma_short": 20, "ma_long": 50, "rsi": True,  "prev_close": True},
     "1d":  {"ma_short": 20, "ma_long": 60, "rsi": True,  "prev_close": True},
 }
 
 PERIOD_SETTINGS = {
-    "5m":  "5d",
+    "5m":  "7d",
     "30m": "15d",
     "1d":  "3mo",  # shortened to avoid NKD=F rollover issues
 }
