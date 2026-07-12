@@ -1,6 +1,6 @@
 streamlit
-yfinance
-pandas
+yfinance==0.2.54
+pandas==2.2.3
 matplotlib
 japanize-matplotlib
 numpy
