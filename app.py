@@ -365,7 +365,7 @@ def generate_image(group_dict, group_title, interval, end_date=None):
     now_str  = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M")
     label    = {"5m": "5min", "30m": "30min", "1d": "Daily"}[interval]
 
-    fig = plt.figure(figsize=(20, 18), facecolor='#0a0a1a')
+    fig = plt.figure(figsize=(16, 14), facecolor='#0a0a1a')
     outer_gs = gridspec.GridSpec(
         2, 2, figure=fig,
         hspace=0.52, wspace=0.14,
@@ -407,9 +407,9 @@ def render_tab(interval, end_date=None):
         st.subheader("📈 Chart 1: Nikkei Futures / SOX / Nasdaq Futures / USD-JPY")
         with st.spinner("Fetching data for Chart 1..."):
             fig1 = generate_image(GROUP1, "Market Chart 1", interval, end_date)
-        st.pyplot(fig1, use_container_width=True)
+        st.pyplot(fig1)
         buf1 = io.BytesIO()
-        fig1.savefig(buf1, format='png', dpi=150,
+        fig1.savefig(buf1, format='png', dpi=100,
                      bbox_inches='tight', facecolor='#0a0a1a')
         buf1.seek(0)
         st.download_button(
@@ -427,9 +427,9 @@ def render_tab(interval, end_date=None):
         st.subheader("📉 Chart 2: Nikkei 225 / VIX / Nikkei VI / US 10Y Yield")
         with st.spinner("Fetching data for Chart 2..."):
             fig2 = generate_image(GROUP2, "Market Chart 2", interval, end_date)
-        st.pyplot(fig2, use_container_width=True)
+        st.pyplot(fig2)
         buf2 = io.BytesIO()
-        fig2.savefig(buf2, format='png', dpi=150,
+        fig2.savefig(buf2, format='png', dpi=100,
                      bbox_inches='tight', facecolor='#0a0a1a')
         buf2.seek(0)
         st.download_button(
